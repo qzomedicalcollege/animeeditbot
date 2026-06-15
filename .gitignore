@@ -1,0 +1,24 @@
+# Environment variables
+.env
+
+# Databases
+*.db
+*.sqlite3
+
+# Python caches and virtual environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.venv/
+env/
+.env/
+
+# Media directories (downloaded clips, temp files, output edits)
+media/
+bot/database/bot.db
+
+# OS specific files
+.DS_Store
+Thumbs.db
