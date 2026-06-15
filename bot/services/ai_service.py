@@ -61,7 +61,7 @@ async def parse_prompt_with_gemini(user_prompt: str) -> dict:
         }
         
         response = client.models.generate_content(
-            model='gemini-1.5-flash',
+            model='gemini-2.5-flash',
             contents=prompt,
             config=config
         )
@@ -78,7 +78,7 @@ async def parse_prompt_with_gemini(user_prompt: str) -> dict:
             legacy_genai.configure(api_key=api_key)
             
             model = legacy_genai.GenerativeModel(
-                model_name='gemini-1.5-flash',
+                model_name='gemini-2.5-flash',
                 system_instruction=system_instruction
             )
             
@@ -115,7 +115,7 @@ async def generate_video_description(style: str, text_overlay: str | None) -> st
         from google import genai
         client = genai.Client(api_key=api_key)
         response = client.models.generate_content(
-            model='gemini-1.5-flash',
+            model='gemini-2.5-flash',
             contents=prompt,
             config={"temperature": 0.7}
         )
@@ -124,7 +124,7 @@ async def generate_video_description(style: str, text_overlay: str | None) -> st
         try:
             import google.generativeai as legacy_genai
             legacy_genai.configure(api_key=api_key)
-            model = legacy_genai.GenerativeModel('gemini-1.5-flash')
+            model = legacy_genai.GenerativeModel('gemini-2.5-flash')
             response = model.generate_content(prompt)
             return response.text.strip()
         except Exception:
