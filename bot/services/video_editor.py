@@ -105,6 +105,7 @@ async def create_edit(
                     duration=seg_duration,
                     style_filter=style_filter,
                     segment_index=segment_index,
+                    keep_audio=(music_path == "original"),
                 )
 
                 if success and Path(seg_path).exists():
@@ -129,11 +130,14 @@ async def create_edit(
 
         # Шаг 4: Конкатенация сегментов
         concat_path = str(TEMP_DIR / "concat_result.mp4")
-        await _concatenate_segments(vertical_segments, concat_path)
+        await _concatenate_segments(vertical_segments, concat_path, keep_audio=(music_path == "original"))
 
         # Шаг 5: Наложение аудио
         audio_path = str(TEMP_DIR / "with_audio.mp4")
-        await _add_audio(concat_path, music_path, audio_path)
+        if music_path == "original":
+            await _copy_file(concat_path, audio_path)
+        else:
+            await _add_audio(concat_path, music_path, audio_path)
 
         # Шаг 6: Наложение текста (если есть)
         if text_overlay:
@@ -284,6 +288,7 @@ async def _cut_and_apply_effects(
     duration: float,
     style_filter: str,
     segment_index: int,
+    keep_audio: bool = False,
 ) -> bool:
     """
     Вырезает сегмент из клипа и применяет стилевые фильтры.
@@ -295,10 +300,13 @@ async def _cut_and_apply_effects(
         duration: длительность сегмента (секунды)
         style_filter: строка FFmpeg-фильтров
         segment_index: индекс сегмента
+        keep_audio: нужно ли сохранять оригинальный звук
 
     Returns:
         True если успешно
     """
+    audio_args = ["-c:a", "aac", "-b:a", "128k"] if keep_audio else ["-an"]
+    
     args = [
         "-ss", f"{start_time:.3f}",
         "-i", input_path,
@@ -307,7 +315,7 @@ async def _cut_and_apply_effects(
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-crf", "28",  # Было 23, увеличили для сжатия
-        "-an",  # Убираем аудио из сегментов
+        *audio_args,
         "-r", str(OUTPUT_FPS),
         output_path,
     ]
@@ -327,7 +335,7 @@ async def _cut_and_apply_effects(
             "-c:v", "libx264",
             "-preset", "ultrafast",
             "-crf", "28",
-            "-an",
+            *audio_args,
             "-r", str(OUTPUT_FPS),
             output_path,
         ]
@@ -336,13 +344,14 @@ async def _cut_and_apply_effects(
     return success
 
 
-async def _concatenate_segments(segments: list[str], output_path: str) -> bool:
+async def _concatenate_segments(segments: list[str], output_path: str, keep_audio: bool = False) -> bool:
     """
     Конкатенация видео-сегментов через FFmpeg concat demuxer.
 
     Args:
         segments: список путей к сегментам
         output_path: путь для выходного файла
+        keep_audio: сохранено ли аудио в сегментах
 
     Returns:
         True если успешно
@@ -356,6 +365,8 @@ async def _concatenate_segments(segments: list[str], output_path: str) -> bool:
             safe_path = seg.replace("'", "'\\''")
             f.write(f"file '{safe_path}'\n")
 
+    audio_args = ["-c:a", "aac", "-b:a", "128k"] if keep_audio else []
+
     args = [
         "-f", "concat",
         "-safe", "0",
@@ -365,6 +376,7 @@ async def _concatenate_segments(segments: list[str], output_path: str) -> bool:
         "-crf", "26",  # Было 21
         "-r", str(OUTPUT_FPS),
         "-pix_fmt", "yuv420p",
+        *audio_args,
         output_path,
     ]
 

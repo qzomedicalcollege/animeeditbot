@@ -36,7 +36,8 @@ router = Router(name="upload")
 # === FSM-состояния ===
 class EditStates(StatesGroup):
     """Состояния конечного автомата для создания эдита."""
-    waiting_mode = State()       # Выбор режима (manual / auto)
+    waiting_mode = State()       # Выбор режима (manual / auto / local)
+    waiting_local_file = State() # Ожидание выбора локального видеофайла
     waiting_ai_prompt = State()  # Ожидание ввода текстового промпта
     waiting_clips = State()      # Ожидание загрузки клипов
     waiting_music = State()      # Ожидание загрузки музыки
@@ -104,6 +105,89 @@ async def handle_mode_auto(callback: CallbackQuery, state: FSMContext) -> None:
         "• <i>«эдит с боем Наруто и Саске, рок-музыка»</i>\n\n"
         "ИИ сам найдет видео и трек на YouTube, вырежет лучшие кадры и смонтирует ролик!",
         reply_markup=get_cancel_keyboard(),
+    )
+    await callback.answer()
+
+
+# === Выбор локального режима ===
+@router.callback_query(F.data == "mode_local", EditStates.waiting_mode)
+@router.callback_query(F.data == "refresh_files", EditStates.waiting_local_file)
+async def handle_mode_local(callback: CallbackQuery, state: FSMContext) -> None:
+    """Переход к выбору локального файла."""
+    from bot.config import RAW_DIR
+    from bot.keyboards.inline import get_local_files_keyboard
+    await state.update_data(mode="local")
+    await state.set_state(EditStates.waiting_local_file)
+
+    supported_extensions = {".mp4", ".mkv", ".avi", ".mov", ".webm", ".3gp"}
+    video_files = []
+    if RAW_DIR.exists():
+        video_files = [
+            str(f) for f in RAW_DIR.iterdir()
+            if f.is_file() and f.suffix.lower() in supported_extensions
+        ]
+
+    video_files.sort()
+    await state.update_data(local_files=video_files)
+
+    if not video_files:
+        await callback.message.edit_text(
+            "🎬 <b>Нарезка локального фильма</b>\n\n"
+            "⚠️ <b>В папке нет подходящих видеофайлов!</b>\n\n"
+            "Пожалуйста, скопируйте видеофайлы (фильмы, серии аниме в форматах .mp4, .mkv) "
+            "в папку проекта <code>media/raw</code> на вашем устройстве.\n\n"
+            "После копирования нажмите кнопку <b>«🔄 Обновить список»</b> 👇",
+            reply_markup=get_local_files_keyboard([]),
+        )
+    else:
+        await callback.message.edit_text(
+            "🎬 <b>Нарезка локального фильма</b>\n\n"
+            f"Найдено видеофайлов: {len(video_files)}\n"
+            "Выберите файл для создания нарезки 👇",
+            reply_markup=get_local_files_keyboard(video_files),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("select_file:"), EditStates.waiting_local_file)
+async def handle_local_file_selection(callback: CallbackQuery, state: FSMContext) -> None:
+    """Выбор локального видеофайла."""
+    data = await state.get_data()
+    video_files = data.get("local_files", [])
+    
+    try:
+        idx = int(callback.data.split(":")[1])
+        selected_file = video_files[idx]
+    except (IndexError, ValueError) as e:
+        logger.error("Ошибка выбора файла: %s", e)
+        await callback.answer("❌ Ошибка выбора файла. Попробуйте обновить список.", show_alert=True)
+        return
+
+    filename = Path(selected_file).name
+    await state.update_data(clips=[selected_file])
+    await state.set_state(EditStates.waiting_music)
+
+    from bot.keyboards.inline import get_local_music_keyboard
+    await callback.message.edit_text(
+        f"📁 Выбран файл: <b>{filename}</b>\n\n"
+        "🎵 <b>Шаг 2/4 — Загрузка музыки</b>\n\n"
+        "Отправьте аудио-файл (.mp3, .wav и т.д.) или нажмите кнопку <b>«🔊 Оригинальный звук фильма»</b> 👇",
+        reply_markup=get_local_music_keyboard(),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "music_original", EditStates.waiting_music)
+async def handle_original_music(callback: CallbackQuery, state: FSMContext) -> None:
+    """Использование оригинального звука видео вместо наложения музыки."""
+    await state.update_data(music_path="original")
+    await state.set_state(EditStates.waiting_style)
+
+    await callback.message.edit_text(
+        "🔊 Выбран оригинальный звук фильма.\n\n"
+        "🎨 <b>Шаг 3/4 — Выбор стиля</b>\n\n"
+        "Выбери стиль для своего эдита 👇",
+        reply_markup=get_style_keyboard(),
     )
     await callback.answer()
 

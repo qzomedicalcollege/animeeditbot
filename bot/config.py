@@ -25,9 +25,10 @@ CLIPS_DIR: Path = MEDIA_DIR / "clips"
 MUSIC_DIR: Path = MEDIA_DIR / "music"
 OUTPUT_DIR: Path = MEDIA_DIR / "output"
 TEMP_DIR: Path = MEDIA_DIR / "temp"
+RAW_DIR: Path = MEDIA_DIR / "raw"
 
 # Создаём все необходимые директории при старте
-for directory in (CLIPS_DIR, MUSIC_DIR, OUTPUT_DIR, TEMP_DIR):
+for directory in (CLIPS_DIR, MUSIC_DIR, OUTPUT_DIR, TEMP_DIR, RAW_DIR):
     directory.mkdir(parents=True, exist_ok=True)
 
 # Ограничения

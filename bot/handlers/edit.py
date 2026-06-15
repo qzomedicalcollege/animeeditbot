@@ -170,18 +170,36 @@ async def _start_generation(
             if not clips:
                 raise RuntimeError("Не удалось нарезать сцены из видео-пака")
 
-        # Шаг 1: Детекция битов
-        await bot.edit_message_text(
-            "🎵 Анализирую ритм музыки...",
-            chat_id=chat_id,
-            message_id=progress_msg.message_id,
-        )
+        elif mode == "local":
+            if not clips:
+                raise ValueError("Не выбран файл для нарезки!")
+            raw_video = clips[0]
 
-        beats = await detect_beats(music_path)
-        if not beats:
-            # Если биты не обнаружены — используем равномерную нарезку
-            logger.warning("Биты не обнаружены, используем равномерную нарезку")
-            beats = [i * 0.5 for i in range(60)]  # Каждые 0.5 сек
+            await bot.edit_message_text(
+                "✂️ Анализирую фильм и вырезаю лучшие экшен-моменты...",
+                chat_id=chat_id,
+                message_id=progress_msg.message_id,
+            )
+            from bot.services.scene_detector import extract_smart_clips
+            clips = await extract_smart_clips(raw_video, max_clips=5)
+            if not clips:
+                raise RuntimeError("Не удалось нарезать сцены из видеофайла")
+
+        # Шаг 1: Детекция битов (или оригинальный звук)
+        if music_path == "original":
+            # Для оригинального звука используем равномерную нарезку по размеру нарезанных сцен
+            beats = [i * 2.5 for i in range(len(clips) + 1)]
+        else:
+            await bot.edit_message_text(
+                "🎵 Анализирую ритм музыки...",
+                chat_id=chat_id,
+                message_id=progress_msg.message_id,
+            )
+            beats = await detect_beats(music_path)
+            if not beats:
+                # Если биты не обнаружены — используем равномерную нарезку
+                logger.warning("Биты не обнаружены, используем равномерную нарезку")
+                beats = [i * 0.5 for i in range(60)]  # Каждые 0.5 сек
 
         logger.info("Обнаружено %d битов", len(beats))
 
@@ -262,10 +280,14 @@ async def _start_generation(
             reply_markup=get_main_menu_keyboard(),
         )
     finally:
-        # Очищаем временные файлы (клипы и музыку)
-        temp_files = clips.copy()
-        if music_path:
+        # Очищаем временные файлы (клипы и музыку), не затрагивая исходники в media/raw
+        temp_files = []
+        for c in clips:
+            if "media/raw" not in str(c):
+                temp_files.append(c)
+        if music_path and music_path != "original" and "media/raw" not in str(music_path):
             temp_files.append(music_path)
+        
         # Также очищаем скачанные исходные файлы
         temp_files.extend(downloaded_raw_files)
         cleanup_files(temp_files)

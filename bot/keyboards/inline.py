@@ -4,6 +4,7 @@
 Главное меню, выбор стиля, подтверждение, отмена.
 """
 
+from pathlib import Path
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -29,7 +30,40 @@ def get_mode_keyboard() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="📥 Загрузить файлы вручную", callback_data="mode_manual")
     )
     builder.row(
+        InlineKeyboardButton(text="🎬 Нарезать локальный фильм", callback_data="mode_local")
+    )
+    builder.row(
         InlineKeyboardButton(text="🤖 Использовать ИИ-режиссер (Авто)", callback_data="mode_auto")
+    )
+    builder.row(
+        InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")
+    )
+    return builder.as_markup()
+
+
+def get_local_files_keyboard(files: list[str]) -> InlineKeyboardMarkup:
+    """Клавиатура со списком локальных файлов для нарезки."""
+    builder = InlineKeyboardBuilder()
+    for idx, filepath in enumerate(files):
+        filename = Path(filepath).name
+        display_name = filename if len(filename) <= 35 else filename[:32] + "..."
+        builder.row(
+            InlineKeyboardButton(text=f"📁 {display_name}", callback_data=f"select_file:{idx}")
+        )
+    builder.row(
+        InlineKeyboardButton(text="🔄 Обновить список", callback_data="refresh_files")
+    )
+    builder.row(
+        InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")
+    )
+    return builder.as_markup()
+
+
+def get_local_music_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора музыки в локальном режиме."""
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="🔊 Оригинальный звук фильма", callback_data="music_original")
     )
     builder.row(
         InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")
