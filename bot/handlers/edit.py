@@ -70,9 +70,9 @@ async def handle_text_input(message: Message, state: FSMContext, bot: Bot) -> No
 @router.callback_query(F.data == "skip_text", EditStates.waiting_text)
 async def skip_text(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
     """Пропуск текстового наложения."""
+    await callback.answer()
     await state.update_data(text_overlay=None)
     await _start_generation(callback, state, bot, reply_to_message=False)
-    await callback.answer()
 
 
 # === Генерация видео ===

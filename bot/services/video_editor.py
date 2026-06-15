@@ -56,7 +56,13 @@ async def create_edit(
 
     try:
         # Шаг 1: Определяем длительности для нарезки из битов
-        cut_points = _calculate_cut_points(beats, len(clips))
+        if music_path == "original":
+            cut_points = []
+            for clip_path in clips:
+                clip_duration = await get_video_duration(clip_path)
+                cut_points.append(clip_duration if clip_duration is not None else 2.5)
+        else:
+            cut_points = _calculate_cut_points(beats, len(clips))
         logger.info("Точки нарезки: %s", cut_points[:10])
 
         # Шаг 2: Нарезаем и применяем эффекты к каждому сегменту
