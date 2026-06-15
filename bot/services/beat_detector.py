@@ -88,14 +88,53 @@ def _detect_beats_sync(audio_path: str) -> list[float]:
             total_frames / float(actual_samplerate),
         )
 
+
         return beats
 
     except ImportError:
-        logger.warning("aubio не установлен, пробуем FFmpeg fallback")
+        logger.warning("Python-библиотека aubio не найдена, пробуем системную утилиту aubio CLI")
+        cli_beats = _detect_beats_aubio_cli(audio_path)
+        if cli_beats:
+            return cli_beats
         return _detect_beats_ffmpeg_fallback(audio_path)
     except Exception as e:
         logger.error("Ошибка детекции битов: %s", e)
+        cli_beats = _detect_beats_aubio_cli(audio_path)
+        if cli_beats:
+            return cli_beats
         return _detect_beats_ffmpeg_fallback(audio_path)
+
+
+def _detect_beats_aubio_cli(audio_path: str) -> list[float]:
+    """
+    Детекция битов с помощью консольной утилиты aubio CLI.
+    Используется как фоллбэк, если питоновская библиотека не скомпилировалась.
+    """
+    import subprocess
+    logger.info("Запуск детекции битов через консольную утилиту aubio tempo...")
+    cmd = ["aubio", "tempo", audio_path]
+    try:
+        process = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if process.returncode == 0:
+            beats = []
+            for line in process.stdout.splitlines():
+                line = line.strip()
+                if line:
+                    try:
+                        beats.append(round(float(line), 4))
+                    except ValueError:
+                        pass
+            if beats:
+                logger.info("Успешно обнаружено %d битов через aubio CLI", len(beats))
+                return beats
+        else:
+            logger.warning("Консольная утилита aubio вернула ошибку: %s", process.stderr)
+    except FileNotFoundError:
+        logger.warning("Системная утилита 'aubio' не найдена. Установите её через 'pkg install aubio'")
+    except Exception as e:
+        logger.warning("Исключение при вызове aubio CLI: %s", e)
+    return []
+
 
 
 def _detect_beats_ffmpeg_fallback(audio_path: str) -> list[float]:
